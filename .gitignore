@@ -1,0 +1,55 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
+
+## Rider
+.idea/
+
+## VS Code
+.vscode/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+## NuGet
+**/packages/*
+*.nupkg
+**/[Pp]ackages/
+*.nuget.props
+*.nuget.targets
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Environment
+.env
+*.env.local
+appsettings.*.local.json
+
+## Docker
+postgres_data/
+
+## Test results
+TestResults/
+coverage/
+
+# Docs
+docs/

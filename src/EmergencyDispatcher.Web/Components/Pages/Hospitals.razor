@@ -1,0 +1,193 @@
+@page "/hospitals"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IHospitalService HospitalService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Hospitals - Emergency Dispatch</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex align-center justify-space-between">
+        <MudText Typo="Typo.h4">Hospital Directory</MudText>
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenAddDialog">
+                    Add Hospital
+                </MudButton>
+            </Authorized>
+        </AuthorizeView>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudTable Items="_hospitals"
+                  Dense="true"
+                  Hover="true"
+                  Loading="_loading"
+                  Breakpoint="Breakpoint.Sm"
+                  T="Hospital">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Triage Contact</MudTh>
+                <MudTh>Phone</MudTh>
+                <MudTh>WhatsApp</MudTh>
+                <MudTh>Preferred Method</MudTh>
+                @if (_isAdmin)
+                {
+                    <MudTh>Actions</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate Context="hospital">
+                <MudTd DataLabel="Name">@hospital.Name</MudTd>
+                <MudTd DataLabel="Triage Contact">@(hospital.TriageContactName ?? "N/A")</MudTd>
+                <MudTd DataLabel="Phone">@(hospital.TriagePhone ?? "N/A")</MudTd>
+                <MudTd DataLabel="WhatsApp">@(hospital.TriageWhatsApp ?? "N/A")</MudTd>
+                <MudTd DataLabel="Method">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@hospital.PreferredNotificationMethod</MudChip>
+                </MudTd>
+                @if (_isAdmin)
+                {
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       OnClick="() => OpenEditDialog(hospital)" />
+                    </MudTd>
+                }
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No hospitals registered.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+<!-- Inline edit dialog -->
+<MudDialog @bind-Visible="_dialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editModel.Id == 0 ? "Add" : "Edit") Hospital</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_editModel.Name"
+                              Label="Hospital Name"
+                              Variant="Variant.Outlined"
+                              Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_editModel.TriageContactName"
+                              Label="Triage Contact Name"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_editModel.TriagePhone"
+                              Label="Triage Phone"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_editModel.TriageWhatsApp"
+                              Label="Triage WhatsApp"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudSelect @bind-Value="_editModel.PreferredNotificationMethod"
+                           Label="Preferred Notification Method"
+                           Variant="Variant.Outlined">
+                    @foreach (NotificationMethod m in Enum.GetValues<NotificationMethod>())
+                    {
+                        <MudSelectItem Value="m">@m</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveHospital">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Hospital> _hospitals = [];
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _isAdmin;
+    private Hospital _editModel = new();
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _isAdmin = authState.User.IsInRole("Admin");
+        await LoadHospitals();
+    }
+
+    private async Task LoadHospitals()
+    {
+        _loading = true;
+        _hospitals = await HospitalService.GetAllAsync();
+        _loading = false;
+    }
+
+    private void OpenAddDialog()
+    {
+        _editModel = new Hospital();
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(Hospital hospital)
+    {
+        _editModel = new Hospital
+        {
+            Id = hospital.Id,
+            Name = hospital.Name,
+            TriageContactName = hospital.TriageContactName,
+            TriagePhone = hospital.TriagePhone,
+            TriageWhatsApp = hospital.TriageWhatsApp,
+            PreferredNotificationMethod = hospital.PreferredNotificationMethod
+        };
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveHospital()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Name))
+        {
+            Snackbar.Add("Hospital name is required.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (_editModel.Id == 0)
+            {
+                await HospitalService.CreateAsync(_editModel);
+                Snackbar.Add("Hospital added.", Severity.Success);
+            }
+            else
+            {
+                await HospitalService.UpdateAsync(_editModel);
+                Snackbar.Add("Hospital updated.", Severity.Success);
+            }
+
+            _dialogVisible = false;
+            await LoadHospitals();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+}

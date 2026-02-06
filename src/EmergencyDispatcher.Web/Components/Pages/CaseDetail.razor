@@ -1,0 +1,329 @@
+@page "/cases/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ICaseService CaseService
+@inject ISbarGenerator SbarGenerator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@using Microsoft.AspNetCore.Identity
+
+<PageTitle>Case #@Id - Emergency Dispatch</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_case == null)
+{
+    <MudAlert Severity="Severity.Error">Case not found.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <!-- Header -->
+        <MudItem xs="12" Class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                               Href="/dashboard" Class="mr-2" />
+                <MudText Typo="Typo.h4" Class="mr-3">Case #@_case.Id</MudText>
+                <MudChip T="string" Color="GetStatusColor(_case.Status)" Size="Size.Medium">
+                    @FormatStatus(_case.Status)
+                </MudChip>
+            </div>
+            <MudSelect T="CaseStatus"
+                       Value="_case.Status"
+                       ValueChanged="UpdateStatus"
+                       Label="Update Status"
+                       Variant="Variant.Outlined"
+                       Dense="true"
+                       Style="max-width: 200px;">
+                @foreach (CaseStatus s in Enum.GetValues<CaseStatus>())
+                {
+                    <MudSelectItem Value="s">@FormatStatus(s)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <!-- Patient Info -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Patient Information</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td><strong>Name</strong></td><td>@_case.PatientName</td></tr>
+                            <tr><td><strong>Age / Sex</strong></td><td>@_case.Age / @(_case.Sex ?? "N/A")</td></tr>
+                            <tr><td><strong>Emergency</strong></td><td>@_case.EmergencyType</td></tr>
+                            <tr><td><strong>Location</strong></td><td>@(_case.LocationText ?? "N/A")</td></tr>
+                            <tr><td><strong>Transport</strong></td><td>@(_case.TransportMethod ?? "N/A")</td></tr>
+                            <tr><td><strong>ETA</strong></td><td>@(_case.EstimatedEta.HasValue ? $"{_case.EstimatedEta} min" : "N/A")</td></tr>
+                            <tr><td><strong>Hospital</strong></td><td>@(_case.Hospital?.Name ?? "N/A")</td></tr>
+                            <tr><td><strong>Notes</strong></td><td>@(_case.Notes ?? "None")</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Member Info -->
+        <MudItem xs="12" md="6">
+            @if (_case.Member != null)
+            {
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Linked Member</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <tbody>
+                                <tr><td><strong>Name</strong></td><td>@_case.Member.FullName</td></tr>
+                                <tr><td><strong>Phone</strong></td><td>@_case.Member.Phone</td></tr>
+                                <tr><td><strong>DOB</strong></td><td>@_case.Member.DateOfBirth</td></tr>
+                                <tr><td><strong>Conditions</strong></td><td>@(_case.Member.MedicalConditions ?? "None")</td></tr>
+                                <tr><td><strong>Medications</strong></td><td>@(_case.Member.Medications ?? "None")</td></tr>
+                                <tr><td><strong>Allergies</strong></td><td>@(_case.Member.Allergies ?? "None")</td></tr>
+                                <tr><td><strong>Emergency Contact</strong></td><td>@(_case.Member.EmergencyContact ?? "N/A")</td></tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No linked member profile.
+                </MudAlert>
+            }
+        </MudItem>
+
+        <!-- SBAR Generator -->
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">SBAR Notification</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" Class="mb-4">
+                        <MudButton OnClick="@(() => GenerateSbar("call"))"
+                                   Variant="@(_sbarMode == "call" ? Variant.Filled : Variant.Outlined)">
+                            Call Script
+                        </MudButton>
+                        <MudButton OnClick="@(() => GenerateSbar("message"))"
+                                   Variant="@(_sbarMode == "message" ? Variant.Filled : Variant.Outlined)">
+                            Message
+                        </MudButton>
+                        <MudButton OnClick="@(() => GenerateSbar("email"))"
+                                   Variant="@(_sbarMode == "email" ? Variant.Filled : Variant.Outlined)">
+                            Email
+                        </MudButton>
+                    </MudButtonGroup>
+
+                    @if (!string.IsNullOrEmpty(_sbarText))
+                    {
+                        <MudTextField Value="_sbarText"
+                                      Variant="Variant.Outlined"
+                                      Lines="12"
+                                      ReadOnly="true"
+                                      Class="mb-2"
+                                      Style="font-family: monospace;" />
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.ContentCopy"
+                                   OnClick="CopyToClipboard">
+                            Copy to Clipboard
+                        </MudButton>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Notification Logging -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Log Notification</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudSelect @bind-Value="_notifyMethod"
+                               Label="Notification Method"
+                               Variant="Variant.Outlined"
+                               Class="mb-3">
+                        @foreach (NotificationMethod m in Enum.GetValues<NotificationMethod>())
+                        {
+                            <MudSelectItem Value="m">@m</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_notifyNotes"
+                                  Label="Notes"
+                                  Variant="Variant.Outlined"
+                                  Lines="2"
+                                  Class="mb-3" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Send"
+                               OnClick="LogNotification">
+                        Log Notification
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Audit Log Timeline -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Activity Timeline</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_case.AuditLogs.Any())
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start">
+                            @foreach (var log in _case.AuditLogs)
+                            {
+                                <MudTimelineItem Color="GetAuditColor(log.Action)" Size="Size.Small">
+                                    <MudText Typo="Typo.body2"><strong>@log.Action</strong></MudText>
+                                    <MudText Typo="Typo.caption">@log.Details</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @log.Performer?.FullName — @log.Timestamp.ToString("g")
+                                    </MudText>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No activity recorded.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Case? _case;
+    private bool _loading = true;
+    private string _sbarMode = string.Empty;
+    private string _sbarText = string.Empty;
+    private NotificationMethod _notifyMethod = NotificationMethod.Call;
+    private string? _notifyNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCase();
+    }
+
+    private async Task LoadCase()
+    {
+        _loading = true;
+        _case = await CaseService.GetByIdAsync(Id);
+        _loading = false;
+    }
+
+    private async Task<string> GetCurrentUserId()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? throw new InvalidOperationException("User not authenticated");
+    }
+
+    private async Task<ApplicationUser> GetCurrentUser()
+    {
+        var userId = await GetCurrentUserId();
+        return await UserManager.FindByIdAsync(userId)
+            ?? throw new InvalidOperationException("User not found");
+    }
+
+    private async Task UpdateStatus(CaseStatus newStatus)
+    {
+        if (_case == null) return;
+
+        try
+        {
+            var userId = await GetCurrentUserId();
+            await CaseService.UpdateStatusAsync(_case.Id, newStatus, userId);
+            Snackbar.Add($"Status updated to {FormatStatus(newStatus)}.", Severity.Success);
+            await LoadCase();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async void GenerateSbar(string mode)
+    {
+        if (_case == null) return;
+
+        _sbarMode = mode;
+        var dispatcher = await GetCurrentUser();
+
+        _sbarText = mode switch
+        {
+            "call" => SbarGenerator.GenerateCallScript(_case, _case.Member, dispatcher),
+            "message" => SbarGenerator.GenerateMessage(_case, _case.Member, dispatcher),
+            "email" => SbarGenerator.GenerateEmail(_case, _case.Member, dispatcher),
+            _ => string.Empty
+        };
+
+        StateHasChanged();
+    }
+
+    private async Task CopyToClipboard()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _sbarText);
+        Snackbar.Add("Copied to clipboard!", Severity.Info);
+    }
+
+    private async Task LogNotification()
+    {
+        if (_case == null) return;
+
+        try
+        {
+            var userId = await GetCurrentUserId();
+            await CaseService.LogNotificationAsync(_case.Id, _notifyMethod, _notifyNotes, userId);
+            Snackbar.Add("Notification logged.", Severity.Success);
+            _notifyNotes = null;
+            await LoadCase();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetStatusColor(CaseStatus status) => status switch
+    {
+        CaseStatus.Open => Color.Warning,
+        CaseStatus.Notified => Color.Info,
+        CaseStatus.EnRoute => Color.Primary,
+        CaseStatus.Arrived => Color.Success,
+        CaseStatus.Closed => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string FormatStatus(CaseStatus status) => status switch
+    {
+        CaseStatus.EnRoute => "En Route",
+        _ => status.ToString()
+    };
+
+    private static Color GetAuditColor(string action) => action switch
+    {
+        "created" => Color.Success,
+        "status_changed" => Color.Info,
+        "notified" => Color.Primary,
+        "updated" => Color.Warning,
+        "closed" => Color.Default,
+        _ => Color.Default
+    };
+}

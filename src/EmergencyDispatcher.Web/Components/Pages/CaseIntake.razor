@@ -1,0 +1,283 @@
+@page "/cases/new"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ICaseService CaseService
+@inject IMemberService MemberService
+@inject IHospitalService HospitalService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>New Case - Emergency Dispatch</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Emergency Case Intake</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="3">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Class="mb-4">Member Lookup</MudText>
+                <MudTextField @bind-Value="_phoneSearch"
+                              Label="Search by phone number"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Phone"
+                              Immediate="true"
+                              DebounceInterval="300"
+                              OnDebounceIntervalElapsed="LookupMember"
+                              Placeholder="+1-555-1001" />
+
+                @if (_matchedMember != null)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-3" Dense="true">
+                        <strong>Member found:</strong> @_matchedMember.FullName
+                        @if (!string.IsNullOrEmpty(_matchedMember.MedicalConditions))
+                        {
+                            <br /><small>Conditions: @_matchedMember.MedicalConditions</small>
+                        }
+                        @if (!string.IsNullOrEmpty(_matchedMember.Allergies))
+                        {
+                            <br /><small>Allergies: @_matchedMember.Allergies</small>
+                        }
+                    </MudAlert>
+                }
+
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.h6" Class="mb-4">Patient Information</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.PatientName"
+                                      Label="Patient Name"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      RequiredError="Patient name is required" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField @bind-Value="_model.Age"
+                                         Label="Age"
+                                         Variant="Variant.Outlined"
+                                         Min="0" Max="150" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudSelect @bind-Value="_model.Sex"
+                                   Label="Sex"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("Male")">Male</MudSelectItem>
+                            <MudSelectItem Value="@("Female")">Female</MudSelectItem>
+                            <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="_model.EmergencyType"
+                                   Label="Emergency Type"
+                                   Variant="Variant.Outlined"
+                                   Required="true"
+                                   RequiredError="Emergency type is required">
+                            <MudSelectItem Value="@("Chest Pain")">Chest Pain</MudSelectItem>
+                            <MudSelectItem Value="@("Difficulty Breathing")">Difficulty Breathing</MudSelectItem>
+                            <MudSelectItem Value="@("Stroke Symptoms")">Stroke Symptoms</MudSelectItem>
+                            <MudSelectItem Value="@("Trauma / Injury")">Trauma / Injury</MudSelectItem>
+                            <MudSelectItem Value="@("Seizure")">Seizure</MudSelectItem>
+                            <MudSelectItem Value="@("Allergic Reaction")">Allergic Reaction</MudSelectItem>
+                            <MudSelectItem Value="@("Loss of Consciousness")">Loss of Consciousness</MudSelectItem>
+                            <MudSelectItem Value="@("Severe Bleeding")">Severe Bleeding</MudSelectItem>
+                            <MudSelectItem Value="@("Burns")">Burns</MudSelectItem>
+                            <MudSelectItem Value="@("Poisoning / Overdose")">Poisoning / Overdose</MudSelectItem>
+                            <MudSelectItem Value="@("Pregnancy / Labor")">Pregnancy / Labor</MudSelectItem>
+                            <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="_model.TransportMethod"
+                                   Label="Transport Method"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("Ambulance")">Ambulance</MudSelectItem>
+                            <MudSelectItem Value="@("Private Vehicle")">Private Vehicle</MudSelectItem>
+                            <MudSelectItem Value="@("Walk-in")">Walk-in</MudSelectItem>
+                            <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.LocationText"
+                                      Label="Location / Address"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.LocationOn" />
+                    </MudItem>
+
+                    <MudItem xs="6" sm="4">
+                        <MudNumericField @bind-Value="_model.EstimatedEta"
+                                         Label="ETA (minutes)"
+                                         Variant="Variant.Outlined"
+                                         Min="0" Max="999" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="8">
+                        <MudSelect @bind-Value="_model.HospitalId"
+                                   Label="Destination Hospital"
+                                   Variant="Variant.Outlined">
+                            @foreach (var h in _hospitals)
+                            {
+                                <MudSelectItem Value="@((int?)h.Id)">@h.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Notes"
+                                      Label="Additional Notes"
+                                      Variant="Variant.Outlined"
+                                      Lines="3" />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+
+            <MudCardActions Class="pa-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="_submitting"
+                           OnClick="SubmitCase">
+                    @if (_submitting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Create Case
+                </MudButton>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           Href="/dashboard"
+                           Class="ml-2">
+                    Cancel
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    @if (_matchedMember != null)
+    {
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Member Profile</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td><strong>Name</strong></td><td>@_matchedMember.FullName</td></tr>
+                            <tr><td><strong>DOB</strong></td><td>@_matchedMember.DateOfBirth</td></tr>
+                            <tr><td><strong>Phone</strong></td><td>@_matchedMember.Phone</td></tr>
+                            <tr><td><strong>Emergency Contact</strong></td><td>@(_matchedMember.EmergencyContact ?? "N/A")</td></tr>
+                            <tr><td><strong>Conditions</strong></td><td>@(_matchedMember.MedicalConditions ?? "None")</td></tr>
+                            <tr><td><strong>Medications</strong></td><td>@(_matchedMember.Medications ?? "None")</td></tr>
+                            <tr><td><strong>Allergies</strong></td><td>@(_matchedMember.Allergies ?? "None")</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private CaseModel _model = new();
+    private Member? _matchedMember;
+    private List<Hospital> _hospitals = [];
+    private string _phoneSearch = string.Empty;
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hospitals = await HospitalService.GetAllAsync();
+    }
+
+    private async Task LookupMember(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone) || phone.Length < 3)
+        {
+            _matchedMember = null;
+            return;
+        }
+
+        _matchedMember = await MemberService.LookupByPhoneAsync(phone);
+        if (_matchedMember != null)
+        {
+            _model.PatientName = _matchedMember.FullName;
+            _model.Age = _matchedMember.DateOfBirth.HasValue
+                ? CalculateAge(_matchedMember.DateOfBirth.Value)
+                : null;
+            _model.HospitalId = _matchedMember.PreferredHospitalId;
+        }
+    }
+
+    private static int CalculateAge(DateOnly dob)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var age = today.Year - dob.Year;
+        if (dob > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private async Task SubmitCase()
+    {
+        if (string.IsNullOrWhiteSpace(_model.PatientName) || string.IsNullOrWhiteSpace(_model.EmergencyType))
+        {
+            Snackbar.Add("Patient name and emergency type are required.", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? throw new InvalidOperationException("User not authenticated");
+
+            var newCase = new Case
+            {
+                MemberId = _matchedMember?.Id,
+                PatientName = _model.PatientName,
+                Age = _model.Age,
+                Sex = _model.Sex,
+                EmergencyType = _model.EmergencyType,
+                LocationText = _model.LocationText,
+                TransportMethod = _model.TransportMethod,
+                EstimatedEta = _model.EstimatedEta,
+                HospitalId = _model.HospitalId,
+                Notes = _model.Notes
+            };
+
+            var created = await CaseService.CreateAsync(newCase, userId);
+            Snackbar.Add($"Case #{created.Id} created successfully.", Severity.Success);
+            Navigation.NavigateTo($"/cases/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating case: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private sealed class CaseModel
+    {
+        public string PatientName { get; set; } = string.Empty;
+        public int? Age { get; set; }
+        public string? Sex { get; set; }
+        public string EmergencyType { get; set; } = string.Empty;
+        public string? LocationText { get; set; }
+        public string? TransportMethod { get; set; }
+        public int? EstimatedEta { get; set; }
+        public int? HospitalId { get; set; }
+        public string? Notes { get; set; }
+    }
+}

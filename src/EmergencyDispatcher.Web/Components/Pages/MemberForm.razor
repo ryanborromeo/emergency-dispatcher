@@ -1,0 +1,177 @@
+@page "/members/new"
+@page "/members/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IMemberService MemberService
+@inject IHospitalService HospitalService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_isEdit ? "Edit" : "New") Member - Emergency Dispatch</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex align-center">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/members" Class="mr-2" />
+        <MudText Typo="Typo.h4">@(_isEdit ? "Edit" : "Add") Member</MudText>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="3">
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.FullName"
+                                      Label="Full Name"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      RequiredError="Name is required" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.Phone"
+                                      Label="Phone"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      RequiredError="Phone is required"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Phone" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_dateOfBirth"
+                                       Label="Date of Birth"
+                                       Variant="Variant.Outlined"
+                                       DateFormat="yyyy-MM-dd"
+                                       MaxDate="DateTime.Today" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.EmergencyContact"
+                                      Label="Emergency Contact"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Name (Phone)" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.MedicalConditions"
+                                      Label="Medical Conditions"
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      Placeholder="e.g., Diabetes, Hypertension" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.Medications"
+                                      Label="Medications"
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      Placeholder="e.g., Metformin 500mg" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.Allergies"
+                                      Label="Allergies"
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      Placeholder="e.g., Penicillin" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="_model.PreferredHospitalId"
+                                   Label="Preferred Hospital"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true">
+                            @foreach (var h in _hospitals)
+                            {
+                                <MudSelectItem Value="@((int?)h.Id)">@h.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex align-center">
+                        <MudCheckBox @bind-Value="_model.ConsentFlag"
+                                     Label="Consent to share data with hospitals"
+                                     Color="Color.Primary" />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions Class="pa-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="_saving"
+                           OnClick="SaveMember">
+                    @if (_saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    @(_isEdit ? "Update" : "Create") Member
+                </MudButton>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           Href="/members"
+                           Class="ml-2">
+                    Cancel
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private Member _model = new();
+    private List<Hospital> _hospitals = [];
+    private DateTime? _dateOfBirth;
+    private bool _isEdit;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hospitals = await HospitalService.GetAllAsync();
+
+        if (Id.HasValue)
+        {
+            _isEdit = true;
+            var member = await MemberService.GetByIdAsync(Id.Value);
+            if (member != null)
+            {
+                _model = member;
+                _dateOfBirth = member.DateOfBirth?.ToDateTime(TimeOnly.MinValue);
+            }
+        }
+    }
+
+    private async Task SaveMember()
+    {
+        if (string.IsNullOrWhiteSpace(_model.FullName) || string.IsNullOrWhiteSpace(_model.Phone))
+        {
+            Snackbar.Add("Name and phone are required.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            _model.DateOfBirth = _dateOfBirth.HasValue
+                ? DateOnly.FromDateTime(_dateOfBirth.Value)
+                : null;
+
+            if (_isEdit)
+            {
+                await MemberService.UpdateAsync(_model);
+                Snackbar.Add("Member updated.", Severity.Success);
+            }
+            else
+            {
+                await MemberService.CreateAsync(_model);
+                Snackbar.Add("Member created.", Severity.Success);
+            }
+
+            Navigation.NavigateTo("/members");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

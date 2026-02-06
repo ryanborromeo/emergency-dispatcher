@@ -1,0 +1,85 @@
+@page "/audit-logs"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject IAuditService AuditService
+@using EmergencyDispatcher.Web.Data
+@inject ApplicationDbContext Db
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Audit Logs - Emergency Dispatch</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudText Typo="Typo.h4" Class="mb-4">Audit Logs</MudText>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudTable Items="_logs"
+                  Dense="true"
+                  Hover="true"
+                  Loading="_loading"
+                  Breakpoint="Breakpoint.Sm"
+                  T="AuditLog"
+                  SortLabel="Sort By">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<AuditLog, object>(x => x.Timestamp)">Timestamp</MudTableSortLabel></MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Case</MudTh>
+                <MudTh>Performed By</MudTh>
+                <MudTh>Details</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Timestamp">@context.Timestamp.ToString("g")</MudTd>
+                <MudTd DataLabel="Action">
+                    <MudChip T="string" Size="Size.Small" Color="GetActionColor(context.Action)">
+                        @context.Action
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Case">
+                    @if (context.CaseId.HasValue)
+                    {
+                        <MudLink Href="@($"/cases/{context.CaseId}")">Case #@context.CaseId</MudLink>
+                    }
+                    else
+                    {
+                        <span>N/A</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Performed By">@(context.Performer?.FullName ?? context.PerformedBy)</MudTd>
+                <MudTd DataLabel="Details">@(context.Details ?? "—")</MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No audit logs found.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<AuditLog> _logs = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _logs = await Db.AuditLogs
+            .Include(l => l.Performer)
+            .OrderByDescending(l => l.Timestamp)
+            .Take(200)
+            .ToListAsync();
+        _loading = false;
+    }
+
+    private static Color GetActionColor(string action) => action switch
+    {
+        "created" => Color.Success,
+        "status_changed" => Color.Info,
+        "notified" => Color.Primary,
+        "updated" => Color.Warning,
+        "closed" => Color.Default,
+        _ => Color.Default
+    };
+}

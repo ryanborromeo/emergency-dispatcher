@@ -1,0 +1,101 @@
+@page "/login"
+@using Microsoft.AspNetCore.Identity
+@using System.ComponentModel.DataAnnotations
+@layout MainLayout
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+
+<PageTitle>Login - Emergency Dispatch</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="min-height: 80vh;">
+    <MudCard Elevation="4" Class="pa-4 mx-auto" Style="width: 100%; max-width: 440px;">
+        <MudCardContent>
+            <div class="d-flex justify-center mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Emergency"
+                         Color="Color.Error"
+                         Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2">
+                Emergency Dispatch
+            </MudText>
+            <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-6">
+                Sign in to continue
+            </MudText>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            <EditForm Model="Model" OnValidSubmit="HandleLogin" FormName="login">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="Model.Email"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email"
+                              Class="mb-4"
+                              For="@(() => Model.Email)" />
+
+                <MudTextField @bind-Value="Model.Password"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Class="mb-6"
+                              For="@(() => Model.Password)" />
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large">
+                    Sign In
+                </MudButton>
+            </EditForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginModel? _model { get; set; }
+
+    private LoginModel Model => _model ??= new();
+
+    private string? _errorMessage;
+
+    private async Task HandleLogin()
+    {
+        var user = await UserManager.FindByEmailAsync(Model.Email);
+        if (user is null || !user.IsActive)
+        {
+            _errorMessage = "Invalid email or password.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(user, Model.Password, isPersistent: true, lockoutOnFailure: false);
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/dashboard", forceLoad: true);
+        }
+        else
+        {
+            _errorMessage = "Invalid email or password.";
+        }
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

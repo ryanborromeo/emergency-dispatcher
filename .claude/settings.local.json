@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(dotnet:*)",
+      "Bash(dotnet --list-sdks:*)",
+      "Bash(docker --version:*)",
+      "Bash(docker-compose:*)"
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+@page "/members"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IMemberService MemberService
+@inject NavigationManager Navigation
+
+<PageTitle>Members - Emergency Dispatch</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex align-center justify-space-between">
+        <MudText Typo="Typo.h4">Members</MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Href="/members/new">
+            Add Member
+        </MudButton>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudTextField @bind-Value="_searchQuery"
+                      Label="Search members"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="_ => LoadMembers()"
+                      Placeholder="Search by name or phone..." />
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudTable Items="_members"
+                  Dense="true"
+                  Hover="true"
+                  Loading="_loading"
+                  Breakpoint="Breakpoint.Sm"
+                  OnRowClick="OnRowClick"
+                  T="Member"
+                  RowClass="cursor-pointer">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Phone</MudTh>
+                <MudTh>Conditions</MudTh>
+                <MudTh>Allergies</MudTh>
+                <MudTh>Preferred Hospital</MudTh>
+                <MudTh>Consent</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.FullName</MudTd>
+                <MudTd DataLabel="Phone">@context.Phone</MudTd>
+                <MudTd DataLabel="Conditions">@(context.MedicalConditions ?? "None")</MudTd>
+                <MudTd DataLabel="Allergies">@(context.Allergies ?? "None")</MudTd>
+                <MudTd DataLabel="Hospital">@(context.PreferredHospital?.Name ?? "N/A")</MudTd>
+                <MudTd DataLabel="Consent">
+                    <MudIcon Icon="@(context.ConsentFlag ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                             Color="@(context.ConsentFlag ? Color.Success : Color.Error)"
+                             Size="Size.Small" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No members found.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<Member> _members = [];
+    private string _searchQuery = string.Empty;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMembers();
+    }
+
+    private async Task LoadMembers()
+    {
+        _loading = true;
+        _members = await MemberService.SearchAsync(string.IsNullOrWhiteSpace(_searchQuery) ? null : _searchQuery);
+        _loading = false;
+    }
+
+    private void OnRowClick(TableRowClickEventArgs<Member> args)
+    {
+        if (args.Item is not null)
+        {
+            Navigation.NavigateTo($"/members/{args.Item.Id}");
+        }
+    }
+}
