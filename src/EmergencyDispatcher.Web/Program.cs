@@ -78,12 +78,11 @@ app.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
     return Results.Redirect("/login");
 });
 
-// Apply database schema and seed data on startup
+// Apply database migrations and seed data on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    // Use EnsureCreated for initial setup; switch to MigrateAsync once migrations are generated
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
 }
 await SeedData.SeedAsync(app.Services);
 

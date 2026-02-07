@@ -6,7 +6,9 @@
       "Bash(dotnet:*)",
       "Bash(dotnet --list-sdks:*)",
       "Bash(docker --version:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(openspec list:*)",
+      "Bash(openspec validate:*)"
     ]
   }
 }

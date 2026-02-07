@@ -53,3 +53,8 @@ coverage/
 
 # Docs
 docs/
+
+# AI
+openspec/
+AGENTS.md
+CLAUDE.md
