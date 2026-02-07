@@ -8,6 +8,10 @@ RUN dotnet publish -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# Install Kerberos library required by Npgsql for PostgreSQL GSSAPI auth
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Use built-in non-root user from .NET base image

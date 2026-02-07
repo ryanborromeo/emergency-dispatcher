@@ -8,7 +8,9 @@
       "Bash(docker --version:*)",
       "Bash(docker-compose:*)",
       "Bash(openspec list:*)",
-      "Bash(openspec validate:*)"
+      "Bash(openspec validate:*)",
+      "Bash(docker compose down:*)",
+      "Bash(docker compose up:*)"
     ]
   }
 }
